@@ -8,25 +8,29 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #0a0a1a; font-family: Georgia, serif; color: #e2e8f0; }
-  ::-webkit-scrollbar { width: 5px; }
-  ::-webkit-scrollbar-thumb { background: rgba(124,158,248,0.3); border-radius: 3px; }
-  input::placeholder { color: rgba(255,255,255,0.25); }
-  input:focus { outline: none; border-color: #7c9ef8 !important; box-shadow: 0 0 0 3px rgba(124,158,248,0.13); }
-  button:active { opacity: 0.8; transform: scale(0.97); }
-  @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
-  @keyframes slideIn { from{opacity:0;transform:translateX(-10px)} to{opacity:1;transform:translateX(0)} }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0a0a1a; font-family: Georgia, serif; color: #e2e8f0; }
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-thumb { background: rgba(124,158,248,0.3); border-radius: 3px; }
+input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.25); }
+input:focus, textarea:focus, select:focus { outline: none; border-color: #7c9ef8 !important; box-shadow: 0 0 0 3px rgba(124,158,248,0.13); }
+button:active { opacity: 0.8; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+textarea { resize: vertical; }
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
+const { useState, useRef, useEffect, useCallback, useMemo } = React;
 
 // ============================================================
-// CONFIGURACION — Edita aqui tus cursos, modulos y videos
+// STORAGE
 // ============================================================
-const COURSES_CATALOG = [
+const STORAGE_KEY = "lms_v4";
+
+const SEED_COURSES = [
   {
     id: "curso1", title: "Curso de Ventas", description: "Tecnicas y estrategias de ventas modernas.", emoji: "💼",
     modules: [
@@ -37,82 +41,57 @@ const COURSES_CATALOG = [
           { id: "c1m1v2", title: "El proceso de venta", youtubeId: "PwfQGf50QnU", duration: "5:00" },
         ],
         quiz: [
-          { id: "q1", question: "Cual es el primer paso del proceso de venta?", options: ["Cerrar", "Prospectar", "Facturar", "Entregar"], correct: 1 },
-          { id: "q2", question: "Que es un pipeline de ventas?", options: ["Un software", "El flujo de oportunidades", "Un contrato", "Una metrica"], correct: 1 },
-        ],
-      },
-      {
-        id: "c1m2", title: "Modulo 2: Tecnicas de Cierre", description: "Aprende a cerrar ventas con confianza.",
-        videos: [
-          { id: "c1m2v1", title: "Tecnicas de cierre", youtubeId: "PwfQGf50QnU", duration: "5:00" },
-          { id: "c1m2v2", title: "Manejo de objeciones", youtubeId: "PwfQGf50QnU", duration: "5:00" },
-        ],
-        quiz: [
-          { id: "q3", question: "Como se maneja una objecion de precio?", options: ["Ignorarla", "Bajar el precio", "Argumentar el valor", "Terminar la reunion"], correct: 2 },
-          { id: "q4", question: "Que es el cierre por asuncion?", options: ["Asumir que no comprara", "Actuar como si ya decidio", "Pedir descuento", "Esperar al cliente"], correct: 1 },
-        ],
-      },
-    ],
-  },
-  {
-    id: "curso2", title: "Curso de Liderazgo", description: "Desarrolla tus habilidades como lider.", emoji: "🏆",
-    modules: [
-      {
-        id: "c2m1", title: "Modulo 1: Fundamentos", description: "Que hace a un gran lider.",
-        videos: [
-          { id: "c2m1v1", title: "Que es el liderazgo?", youtubeId: "PwfQGf50QnU", duration: "5:00" },
-          { id: "c2m1v2", title: "Estilos de liderazgo", youtubeId: "PwfQGf50QnU", duration: "5:00" },
-        ],
-        quiz: [
-          { id: "q5", question: "Diferencia entre jefe y lider?", options: ["Ninguna", "El lider inspira, el jefe ordena", "El jefe cobra mas", "Sin autoridad"], correct: 1 },
-          { id: "q6", question: "Que es el liderazgo situacional?", options: ["Liderar segun contexto", "Solo en crisis", "Sin estilo fijo", "Todas parcialmente"], correct: 0 },
+          { id: "c1m1q1", question: "Cual es el primer paso del proceso de venta?", options: ["Cerrar","Prospectar","Facturar","Entregar"], correct: 1 },
+          { id: "c1m1q2", question: "Que es un pipeline de ventas?", options: ["Un software","El flujo de oportunidades","Un contrato","Una metrica"], correct: 1 },
         ],
       },
     ],
   },
 ];
 
-const DEFAULT_USERS = [
+const SEED_USERS = [
   { id: "admin", name: "Administrador", password: "admin123", role: "admin", courses: [] },
   { id: "u1", name: "Maria Garcia", password: "alumno1", role: "student", courses: ["curso1"] },
-  { id: "u2", name: "Carlos Lopez", password: "alumno2", role: "student", courses: ["curso1","curso2"] },
-  { id: "u3", name: "Ana Martinez", password: "alumno3", role: "student", courses: ["curso2"] },
 ];
 
-// ============================================================
-// STORAGE
-// ============================================================
-const STORAGE_KEY = "lms_v3_data";
-function loadData() { try { const r=localStorage.getItem(STORAGE_KEY); return r?JSON.parse(r):null; } catch{return null;} }
-function saveData(d) { try { localStorage.setItem(STORAGE_KEY,JSON.stringify(d)); } catch{} }
+function loadData() {
+  try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
+}
+function saveData(d) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch {}
+}
 function initData() {
-  const ex=loadData();
-  if(ex){
-    const ids=new Set(ex.users.map(u=>u.id));
-    const add=DEFAULT_USERS.filter(u=>!ids.has(u.id));
-    if(add.length){ex.users=[...ex.users,...add];saveData(ex);}
+  const ex = loadData();
+  if (ex) {
+    // ensure admin always exists
+    if (!ex.users.find(u => u.id === "admin")) ex.users.unshift(SEED_USERS[0]);
+    if (!ex.courses) ex.courses = SEED_COURSES;
+    saveData(ex);
     return ex;
   }
-  const fresh={users:DEFAULT_USERS.map(u=>({...u})),progress:{}};
+  const fresh = { users: SEED_USERS.map(u => ({...u})), courses: SEED_COURSES, progress: {} };
   saveData(fresh);
   return fresh;
 }
+function uid() { return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
 
 // ============================================================
-// SHARED STYLES
+// STYLES
 // ============================================================
 const B = (v="primary") => {
-  const base={padding:"9px 18px",borderRadius:"8px",cursor:"pointer",fontWeight:"700",fontSize:"13px",fontFamily:"Georgia,serif",border:"none",transition:"opacity 0.15s"};
-  if(v==="ghost") return{...base,background:"transparent",border:"1px solid rgba(255,255,255,0.15)",color:"rgba(255,255,255,0.5)"};
-  if(v==="danger") return{...base,background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.25)",color:"#f87171"};
-  return{...base,background:"linear-gradient(135deg,#7c9ef8,#a78bfa)",color:"#fff"};
+  const base = { padding:"9px 18px", borderRadius:"8px", cursor:"pointer", fontWeight:"700", fontSize:"13px", fontFamily:"Georgia,serif", border:"none", transition:"opacity 0.15s, transform 0.1s" };
+  if (v==="ghost") return {...base, background:"transparent", border:"1px solid rgba(255,255,255,0.15)", color:"rgba(255,255,255,0.5)"};
+  if (v==="danger") return {...base, background:"rgba(239,68,68,0.1)", border:"1px solid rgba(239,68,68,0.25)", color:"#f87171"};
+  if (v==="success") return {...base, background:"rgba(16,185,129,0.12)", border:"1px solid rgba(16,185,129,0.3)", color:"#10b981"};
+  if (v==="sm-ghost") return {...base, padding:"5px 10px", fontSize:"11px", background:"transparent", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.45)"};
+  if (v==="sm-danger") return {...base, padding:"5px 10px", fontSize:"11px", background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.2)", color:"#f87171"};
+  return {...base, background:"linear-gradient(135deg,#7c9ef8,#a78bfa)", color:"#fff"};
 };
-const INP={width:"100%",padding:"10px 14px",borderRadius:"8px",boxSizing:"border-box",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",color:"#fff",fontSize:"14px",fontFamily:"Georgia,serif",outline:"none"};
-
-const { useState, useRef, useEffect, useCallback } = React;
+const INP = { width:"100%", padding:"9px 12px", borderRadius:"7px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.12)", color:"#fff", fontSize:"13px", fontFamily:"Georgia,serif", outline:"none" };
+const CARD = { background:"rgba(255,255,255,0.025)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:"12px", padding:"18px" };
 
 // ============================================================
-// YOUTUBE EMBED
+// YOUTUBE EMBED — minimal controls (only play/pause overlay)
 // ============================================================
 function YoutubeEmbed({ videoId, onComplete, alreadyWatched }) {
   const iframeRef = useRef(null);
@@ -122,77 +101,114 @@ function YoutubeEmbed({ videoId, onComplete, alreadyWatched }) {
   const durationRef = useRef(0);
   const playingRef = useRef(false);
   const [done, setDone] = useState(alreadyWatched);
+  const [playing, setPlaying] = useState(false);
+  const [ready, setReady] = useState(false);
   const onCompleteRef = useRef(onComplete);
-  useEffect(()=>{onCompleteRef.current=onComplete;},[onComplete]);
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
 
-  const markDone = useCallback(()=>{
-    if(watchedRef.current) return;
-    watchedRef.current=true;
+  const markDone = useCallback(() => {
+    if (watchedRef.current) return;
+    watchedRef.current = true;
     setDone(true);
+    setPlaying(false);
     clearInterval(intervalRef.current);
     onCompleteRef.current();
-  },[]);
+  }, []);
 
-  useEffect(()=>{
-    if(alreadyWatched) return;
-    const handleMsg=(e)=>{
+  const sendCmd = useCallback((func, args) => {
+    iframeRef.current && iframeRef.current.contentWindow.postMessage(
+      JSON.stringify({ event:"command", func, args: args || [] }), "*"
+    );
+  }, []);
+
+  const togglePlay = useCallback(() => {
+    if (playing) sendCmd("pauseVideo");
+    else sendCmd("playVideo");
+  }, [playing, sendCmd]);
+
+  useEffect(() => {
+    const handleMsg = (e) => {
       let data;
-      try{data=typeof e.data==="string"?JSON.parse(e.data):e.data;}catch{return;}
-      if(!data||!data.event) return;
+      try { data = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch { return; }
+      if (!data || !data.event) return;
 
-      if(data.event==="onReady"){
-        iframeRef.current&&iframeRef.current.contentWindow.postMessage(JSON.stringify({event:"listening"}),"*");
+      if (data.event === "onReady") {
+        setReady(true);
+        iframeRef.current && iframeRef.current.contentWindow.postMessage(JSON.stringify({ event:"listening" }), "*");
       }
-      if(data.event==="onStateChange"){
-        const state=data.info;
-        if(state===1){
-          playingRef.current=true;
+      if (data.event === "onStateChange") {
+        const s = data.info;
+        if (s === 1) { // PLAYING
+          playingRef.current = true; setPlaying(true);
           clearInterval(intervalRef.current);
-          intervalRef.current=setInterval(()=>{
-            if(!iframeRef.current) return;
-            iframeRef.current.contentWindow.postMessage(JSON.stringify({event:"command",func:"getCurrentTime"}),"*");
-            iframeRef.current.contentWindow.postMessage(JSON.stringify({event:"command",func:"getDuration"}),"*");
-          },700);
+          intervalRef.current = setInterval(() => {
+            sendCmd("getCurrentTime");
+            sendCmd("getDuration");
+          }, 700);
         }
-        if(state===2){playingRef.current=false;clearInterval(intervalRef.current);}
-        if(state===0){playingRef.current=false;clearInterval(intervalRef.current);markDone();}
+        if (s === 2) { playingRef.current = false; setPlaying(false); clearInterval(intervalRef.current); } // PAUSED
+        if (s === 0) { playingRef.current = false; setPlaying(false); clearInterval(intervalRef.current); markDone(); } // ENDED
       }
-      if(data.event==="infoDelivery"&&data.info){
-        if(data.info.duration&&data.info.duration>0) durationRef.current=data.info.duration;
-        if(typeof data.info.currentTime==="number"&&playingRef.current&&!watchedRef.current){
-          const cur=data.info.currentTime;
-          const dur=durationRef.current;
-          if(cur-lastTimeRef.current>5){
-            iframeRef.current&&iframeRef.current.contentWindow.postMessage(
-              JSON.stringify({event:"command",func:"seekTo",args:[Math.max(0,lastTimeRef.current),true]}),"*"
-            );
-          } else { lastTimeRef.current=cur; }
-          if(dur>0&&cur/dur>0.97) markDone();
+      if (data.event === "infoDelivery" && data.info) {
+        if (data.info.duration > 0) durationRef.current = data.info.duration;
+        if (typeof data.info.currentTime === "number" && playingRef.current && !watchedRef.current) {
+          const cur = data.info.currentTime, dur = durationRef.current;
+          // anti-seek: if jumped forward more than 5s, push back
+          if (cur - lastTimeRef.current > 5) {
+            sendCmd("seekTo", [Math.max(0, lastTimeRef.current), true]);
+          } else {
+            lastTimeRef.current = cur;
+          }
+          if (dur > 0 && cur / dur > 0.97) markDone();
         }
       }
     };
-    window.addEventListener("message",handleMsg);
-    return()=>{window.removeEventListener("message",handleMsg);clearInterval(intervalRef.current);};
-  },[videoId,alreadyWatched,markDone]);
+    window.addEventListener("message", handleMsg);
+    return () => { window.removeEventListener("message", handleMsg); clearInterval(intervalRef.current); };
+  }, [videoId, markDone, sendCmd]);
 
-  const src=`https://www.youtube.com/embed/${videoId}?enablejsapi=1&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1`;
+  // YouTube embed with controls=0, disablekb=1 — we handle play/pause via overlay button
+  const src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&controls=0&disablekb=1&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1&fs=0&cc_load_policy=0`;
 
   return (
-    <div style={{marginBottom:"18px"}}>
-      <div style={{position:"relative",paddingBottom:"56.25%",height:0,borderRadius:"11px",overflow:"hidden",background:"#000"}}>
-        <iframe ref={iframeRef} src={src}
+    <div style={{ marginBottom:"18px" }}>
+      <div style={{ position:"relative", paddingBottom:"56.25%", height:0, borderRadius:"11px", overflow:"hidden", background:"#000" }}>
+        <iframe
+          ref={iframeRef}
+          src={src}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
+          style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%", border:"none" }}
           title={videoId}
         />
-        {done&&(
-          <div style={{position:"absolute",top:"10px",right:"10px",background:"rgba(16,185,129,0.92)",color:"#fff",borderRadius:"20px",padding:"4px 12px",fontSize:"12px",fontWeight:"700",pointerEvents:"none"}}>
-            Completado
+        {/* Transparent overlay to block all clicks on the iframe except our button */}
+        <div style={{ position:"absolute", inset:0, zIndex:2, cursor:"pointer" }} onClick={togglePlay} />
+        {/* Play/Pause button */}
+        {ready && !done && (
+          <button
+            onClick={togglePlay}
+            style={{ position:"absolute", bottom:"16px", left:"50%", transform:"translateX(-50%)", zIndex:3, background:"rgba(0,0,0,0.7)", border:"2px solid rgba(255,255,255,0.4)", color:"#fff", borderRadius:"50px", padding:"10px 24px", fontSize:"15px", cursor:"pointer", backdropFilter:"blur(4px)", fontFamily:"Georgia,serif", fontWeight:"700" }}
+          >
+            {playing ? "⏸ Pausar" : "▶ Reproducir"}
+          </button>
+        )}
+        {done && (
+          <div style={{ position:"absolute", inset:0, zIndex:3, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <div style={{ background:"rgba(16,185,129,0.92)", color:"#fff", borderRadius:"20px", padding:"8px 20px", fontSize:"14px", fontWeight:"700" }}>
+              ✓ Video completado
+            </div>
+          </div>
+        )}
+        {!ready && (
+          <div style={{ position:"absolute", inset:0, zIndex:3, display:"flex", alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.4)", fontSize:"13px" }}>
+            Cargando video...
           </div>
         )}
       </div>
-      {!done&&<p style={{color:"#f59e0b",fontSize:"12px",marginTop:"7px",textAlign:"center"}}>Ve el video completo para avanzar. No puedes adelantar.</p>}
+      {!done && (
+        <p style={{ color:"#f59e0b", fontSize:"12px", marginTop:"7px", textAlign:"center" }}>
+          Solo puedes pausar y reanudar. No puedes adelantar el video.
+        </p>
+      )}
     </div>
   );
 }
@@ -200,29 +216,30 @@ function YoutubeEmbed({ videoId, onComplete, alreadyWatched }) {
 // ============================================================
 // LOGIN
 // ============================================================
-function LoginScreen({onLogin}){
-  const [id,setId]=useState("");
-  const [pw,setPw]=useState("");
-  const [error,setError]=useState("");
-  const attempt=()=>{
-    const data=initData();
-    const user=data.users.find(u=>(u.id===id.trim()||u.name.toLowerCase()===id.trim().toLowerCase())&&u.password===pw);
-    if(user) onLogin(user);
-    else setError("Usuario o contrasena incorrectos");
+function LoginScreen({ onLogin }) {
+  const [id, setId] = useState("");
+  const [pw, setPw] = useState("");
+  const [error, setError] = useState("");
+  const attempt = () => {
+    const data = initData();
+    const user = data.users.find(u =>
+      (u.id === id.trim() || u.name.toLowerCase() === id.trim().toLowerCase()) && u.password === pw
+    );
+    if (user) onLogin(user); else setError("Usuario o contrasena incorrectos");
   };
-  return(
-    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(135deg,#0f0f23 0%,#1a1a3e 50%,#0d1b2a 100%)"}}>
-      <div style={{background:"rgba(255,255,255,0.04)",backdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"22px",padding:"44px 38px",width:"100%",maxWidth:"390px",animation:"fadeUp 0.5s ease forwards"}}>
-        <div style={{textAlign:"center",marginBottom:"32px"}}>
-          <div style={{width:"58px",height:"58px",borderRadius:"15px",background:"linear-gradient(135deg,#7c9ef8,#a78bfa)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",fontSize:"24px"}}>🎓</div>
-          <h1 style={{color:"#fff",fontSize:"21px",marginBottom:"5px",fontWeight:"700"}}>Plataforma de Formacion</h1>
-          <p style={{color:"rgba(255,255,255,0.3)",fontSize:"13px"}}>Accede con tus credenciales</p>
+  return (
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"linear-gradient(135deg,#0f0f23,#1a1a3e,#0d1b2a)" }}>
+      <div style={{ background:"rgba(255,255,255,0.04)", backdropFilter:"blur(20px)", border:"1px solid rgba(255,255,255,0.09)", borderRadius:"22px", padding:"44px 38px", width:"100%", maxWidth:"390px", animation:"fadeUp 0.5s ease forwards" }}>
+        <div style={{ textAlign:"center", marginBottom:"32px" }}>
+          <div style={{ width:"58px", height:"58px", borderRadius:"15px", background:"linear-gradient(135deg,#7c9ef8,#a78bfa)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", fontSize:"24px" }}>🎓</div>
+          <h1 style={{ color:"#fff", fontSize:"21px", marginBottom:"5px", fontWeight:"700" }}>Plataforma de Formacion</h1>
+          <p style={{ color:"rgba(255,255,255,0.3)", fontSize:"13px" }}>Accede con tus credenciales</p>
         </div>
-        <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
-          <input style={INP} placeholder="Usuario o nombre completo" value={id} onChange={e=>{setId(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&attempt()}/>
-          <input style={INP} type="password" placeholder="Contrasena" value={pw} onChange={e=>{setPw(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&attempt()}/>
-          {error&&<p style={{color:"#f87171",fontSize:"13px",textAlign:"center"}}>{error}</p>}
-          <button style={{...B("primary"),padding:"13px",fontSize:"15px",marginTop:"4px"}} onClick={attempt}>Entrar →</button>
+        <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+          <input style={INP} placeholder="Usuario o nombre completo" value={id} onChange={e=>{setId(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&attempt()} />
+          <input style={INP} type="password" placeholder="Contrasena" value={pw} onChange={e=>{setPw(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&attempt()} />
+          {error && <p style={{ color:"#f87171", fontSize:"13px", textAlign:"center" }}>{error}</p>}
+          <button style={{ ...B("primary"), padding:"13px", fontSize:"15px", marginTop:"4px" }} onClick={attempt}>Entrar →</button>
         </div>
       </div>
     </div>
@@ -232,113 +249,126 @@ function LoginScreen({onLogin}){
 // ============================================================
 // QUIZ
 // ============================================================
-function QuizSection({quiz,onPass}){
-  const [answers,setAnswers]=useState({});
-  const [submitted,setSubmitted]=useState(false);
-  const [score,setScore]=useState(0);
-  const submit=()=>{
-    const s=quiz.filter(q=>answers[q.id]===q.correct).length/quiz.length;
-    setScore(s);setSubmitted(true);
-    if(s>=0.7) setTimeout(onPass,1400);
+function QuizSection({ quiz, onPass }) {
+  const [answers, setAnswers] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const [score, setScore] = useState(0);
+  const submit = () => {
+    const s = quiz.filter(q => answers[q.id] === q.correct).length / quiz.length;
+    setScore(s); setSubmitted(true);
+    if (s >= 0.7) setTimeout(onPass, 1400);
   };
-  if(submitted) return(
-    <div style={{textAlign:"center",padding:"28px",background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:"12px"}}>
-      <div style={{fontSize:"44px",marginBottom:"8px"}}>{score>=0.7?"🎉":"😞"}</div>
-      <p style={{fontSize:"18px",fontWeight:"700",color:score>=0.7?"#10b981":"#f87171",marginBottom:"10px"}}>
-        {Math.round(score*100)}% — {score>=0.7?"Aprobado! Siguiente modulo desbloqueado...":"Necesitas el 70% para pasar"}
+  if (submitted) return (
+    <div style={{ textAlign:"center", padding:"28px", ...CARD }}>
+      <div style={{ fontSize:"44px", marginBottom:"8px" }}>{score>=0.7?"🎉":"😞"}</div>
+      <p style={{ fontSize:"18px", fontWeight:"700", color:score>=0.7?"#10b981":"#f87171", marginBottom:"10px" }}>
+        {Math.round(score*100)}% — {score>=0.7?"Aprobado! Avanzando...":"Necesitas el 70% para pasar"}
       </p>
-      {score<0.7&&<button style={B("ghost")} onClick={()=>{setAnswers({});setSubmitted(false);}}>Intentar de nuevo</button>}
+      {score < 0.7 && <button style={B("ghost")} onClick={()=>{setAnswers({});setSubmitted(false);}}>Intentar de nuevo</button>}
     </div>
   );
-  const allAnswered=quiz.every(q=>answers[q.id]!==undefined);
-  return(
-    <div style={{background:"rgba(124,158,248,0.04)",border:"1px solid rgba(124,158,248,0.13)",borderRadius:"13px",padding:"22px"}}>
-      <h3 style={{color:"#7c9ef8",marginBottom:"18px",fontSize:"15px"}}>📝 Quiz del modulo</h3>
-      {quiz.map((q,qi)=>(
-        <div key={q.id} style={{marginBottom:"18px"}}>
-          <p style={{color:"#e2e8f0",fontWeight:"600",marginBottom:"9px",fontSize:"14px"}}>{qi+1}. {q.question}</p>
-          <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
-            {q.options.map((opt,oi)=>(
+  const allAnswered = quiz.every(q => answers[q.id] !== undefined);
+  return (
+    <div style={{ background:"rgba(124,158,248,0.04)", border:"1px solid rgba(124,158,248,0.13)", borderRadius:"13px", padding:"22px" }}>
+      <h3 style={{ color:"#7c9ef8", marginBottom:"18px", fontSize:"15px" }}>📝 Quiz del modulo</h3>
+      {quiz.map((q, qi) => (
+        <div key={q.id} style={{ marginBottom:"18px" }}>
+          <p style={{ color:"#e2e8f0", fontWeight:"600", marginBottom:"9px", fontSize:"14px" }}>{qi+1}. {q.question}</p>
+          <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
+            {q.options.map((opt, oi) => (
               <button key={oi} onClick={()=>setAnswers(a=>({...a,[q.id]:oi}))}
-                style={{padding:"9px 13px",borderRadius:"7px",border:"1px solid",textAlign:"left",cursor:"pointer",fontSize:"13px",fontFamily:"Georgia,serif",
+                style={{ padding:"9px 13px", borderRadius:"7px", border:"1px solid", textAlign:"left", cursor:"pointer", fontSize:"13px", fontFamily:"Georgia,serif",
                   borderColor:answers[q.id]===oi?"#7c9ef8":"rgba(255,255,255,0.07)",
                   background:answers[q.id]===oi?"rgba(124,158,248,0.13)":"rgba(255,255,255,0.02)",
-                  color:answers[q.id]===oi?"#7c9ef8":"#94a3b8"}}>
+                  color:answers[q.id]===oi?"#7c9ef8":"#94a3b8" }}>
                 {opt}
               </button>
             ))}
           </div>
         </div>
       ))}
-      <button style={{...B(allAnswered?"primary":"ghost"),marginTop:"6px"}} disabled={!allAnswered} onClick={submit}>Enviar respuestas</button>
+      <button style={{ ...B(allAnswered?"primary":"ghost"), marginTop:"6px" }} disabled={!allAnswered} onClick={submit}>Enviar respuestas</button>
     </div>
   );
 }
 
 // ============================================================
-// COURSE VIEW
+// COURSE VIEW (student)
 // ============================================================
-function CourseView({course,user,onBack}){
-  const [data,setData]=useState(()=>initData());
-  const [activeModId,setActiveModId]=useState(course.modules[0]?.id);
-  const [openVideoId,setOpenVideoId]=useState(null);
-  const persist=d=>{setData(d);saveData(d);};
-  const cp=(data.progress[user.id]||{})[course.id]||{};
+function CourseView({ course, user, onBack }) {
+  const [data, setData] = useState(() => initData());
+  const [activeModId, setActiveModId] = useState(course.modules[0]?.id);
+  const [openVideoId, setOpenVideoId] = useState(null);
+  const persist = d => { setData(d); saveData(d); };
 
-  const isLocked=(modId)=>{
-    if(user.role==="admin") return false;
-    const idx=course.modules.findIndex(m=>m.id===modId);
-    if(idx===0) return false;
+  const cp = useMemo(() => (data.progress[user.id]||{})[course.id]||{}, [data, user.id, course.id]);
+
+  const isModLocked = modId => {
+    if (user.role === "admin") return false;
+    const idx = course.modules.findIndex(m => m.id === modId);
+    if (idx === 0) return false;
     return !cp[course.modules[idx-1].id]?.quizPassed;
   };
 
-  const handleVideoComplete=(modId,videoId)=>{
-    const d=JSON.parse(JSON.stringify(data));
-    const uid=user.id;
-    if(!d.progress[uid]) d.progress[uid]={};
-    if(!d.progress[uid][course.id]) d.progress[uid][course.id]={};
-    if(!d.progress[uid][course.id][modId]) d.progress[uid][course.id][modId]={watchedVideos:[],quizPassed:false};
-    if(!d.progress[uid][course.id][modId].watchedVideos.includes(videoId))
+  const handleVideoComplete = (modId, videoId) => {
+    const d = JSON.parse(JSON.stringify(data));
+    const uid = user.id;
+    if (!d.progress[uid]) d.progress[uid] = {};
+    if (!d.progress[uid][course.id]) d.progress[uid][course.id] = {};
+    if (!d.progress[uid][course.id][modId]) d.progress[uid][course.id][modId] = { watchedVideos:[], quizPassed:false };
+    if (!d.progress[uid][course.id][modId].watchedVideos.includes(videoId))
       d.progress[uid][course.id][modId].watchedVideos.push(videoId);
     persist(d);
+
+    // Auto-open next video in module
+    const mod = course.modules.find(m => m.id === modId);
+    if (mod) {
+      const vidIdx = mod.videos.findIndex(v => v.id === videoId);
+      if (vidIdx < mod.videos.length - 1) {
+        setTimeout(() => setOpenVideoId(mod.videos[vidIdx+1].id), 800);
+      }
+    }
   };
 
-  const handleQuizPass=(modId)=>{
-    const d=JSON.parse(JSON.stringify(data));
-    const uid=user.id;
-    if(!d.progress[uid]) d.progress[uid]={};
-    if(!d.progress[uid][course.id]) d.progress[uid][course.id]={};
-    if(!d.progress[uid][course.id][modId]) d.progress[uid][course.id][modId]={watchedVideos:[],quizPassed:false};
-    d.progress[uid][course.id][modId].quizPassed=true;
+  const handleQuizPass = (modId) => {
+    const d = JSON.parse(JSON.stringify(data));
+    const uid = user.id;
+    if (!d.progress[uid]) d.progress[uid] = {};
+    if (!d.progress[uid][course.id]) d.progress[uid][course.id] = {};
+    if (!d.progress[uid][course.id][modId]) d.progress[uid][course.id][modId] = { watchedVideos:[], quizPassed:false };
+    d.progress[uid][course.id][modId].quizPassed = true;
     persist(d);
-    const idx=course.modules.findIndex(m=>m.id===modId);
-    if(idx<course.modules.length-1) setTimeout(()=>{setActiveModId(course.modules[idx+1].id);setOpenVideoId(null);},1600);
+    // Auto-advance to next module
+    const idx = course.modules.findIndex(m => m.id === modId);
+    if (idx < course.modules.length - 1) {
+      setTimeout(() => { setActiveModId(course.modules[idx+1].id); setOpenVideoId(null); }, 1600);
+    }
   };
 
-  const completedCount=course.modules.filter(m=>cp[m.id]?.quizPassed).length;
+  const completedCount = course.modules.filter(m => cp[m.id]?.quizPassed).length;
 
-  return(
-    <div style={{display:"flex",flex:1,height:"calc(100vh - 56px)"}}>
+  return (
+    <div style={{ display:"flex", flex:1, height:"calc(100vh - 56px)" }}>
       {/* Sidebar */}
-      <div style={{width:"260px",flexShrink:0,borderRight:"1px solid rgba(255,255,255,0.07)",padding:"16px 10px",display:"flex",flexDirection:"column",gap:"3px",overflowY:"auto"}}>
-        <button onClick={onBack} style={{...B("ghost"),textAlign:"left",marginBottom:"10px",padding:"7px 11px",fontSize:"12px"}}>← Mis cursos</button>
-        <div style={{padding:"0 4px 10px",borderBottom:"1px solid rgba(255,255,255,0.06)",marginBottom:"6px"}}>
-          <p style={{color:"#fff",fontWeight:"700",marginBottom:"2px",fontSize:"13px"}}>{course.emoji} {course.title}</p>
-          <p style={{color:"rgba(255,255,255,0.28)",fontSize:"11px"}}>{completedCount}/{course.modules.length} modulos completados</p>
+      <div style={{ width:"260px", flexShrink:0, borderRight:"1px solid rgba(255,255,255,0.07)", padding:"14px 10px", display:"flex", flexDirection:"column", gap:"3px", overflowY:"auto" }}>
+        <button onClick={onBack} style={{ ...B("ghost"), textAlign:"left", marginBottom:"10px", padding:"7px 11px", fontSize:"12px" }}>← Mis cursos</button>
+        <div style={{ padding:"0 4px 10px", borderBottom:"1px solid rgba(255,255,255,0.06)", marginBottom:"6px" }}>
+          <p style={{ color:"#fff", fontWeight:"700", marginBottom:"2px", fontSize:"13px" }}>{course.emoji} {course.title}</p>
+          <p style={{ color:"rgba(255,255,255,0.28)", fontSize:"11px" }}>{completedCount}/{course.modules.length} modulos completados</p>
         </div>
-        {course.modules.map(mod=>{
-          const locked=isLocked(mod.id);
-          const done=cp[mod.id]?.quizPassed;
-          const isActive=activeModId===mod.id;
-          const watched=cp[mod.id]?.watchedVideos?.length||0;
-          return(
-            <button key={mod.id} onClick={()=>{if(!locked){setActiveModId(mod.id);setOpenVideoId(null);}}}
-              style={{width:"100%",padding:"10px 13px",borderRadius:"8px",border:"1px solid",borderColor:isActive?"#7c9ef8":"transparent",background:isActive?"rgba(124,158,248,0.09)":"transparent",cursor:locked?"not-allowed":"pointer",textAlign:"left",fontFamily:"Georgia,serif"}}>
-              <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
-                <span style={{fontSize:"14px"}}>{done?"✅":locked?"🔒":"📖"}</span>
+        {course.modules.map(mod => {
+          const locked = isModLocked(mod.id);
+          const done = cp[mod.id]?.quizPassed;
+          const isActive = activeModId === mod.id;
+          const watched = cp[mod.id]?.watchedVideos?.length || 0;
+          return (
+            <button key={mod.id} onClick={()=>{ if(!locked){setActiveModId(mod.id);setOpenVideoId(null);} }}
+              style={{ width:"100%", padding:"10px 13px", borderRadius:"8px", border:"1px solid", borderColor:isActive?"#7c9ef8":"transparent", background:isActive?"rgba(124,158,248,0.09)":"transparent", cursor:locked?"not-allowed":"pointer", textAlign:"left", fontFamily:"Georgia,serif" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                <span style={{ fontSize:"14px" }}>{done?"✅":locked?"🔒":"📖"}</span>
                 <div>
-                  <p style={{fontSize:"12px",fontWeight:"600",color:locked?"rgba(255,255,255,0.18)":isActive?"#7c9ef8":"#cbd5e1"}}>{mod.title}</p>
-                  {!locked&&<p style={{fontSize:"10px",color:"rgba(255,255,255,0.25)",marginTop:"1px"}}>{watched}/{mod.videos.length} videos</p>}
+                  <p style={{ fontSize:"12px", fontWeight:"600", color:locked?"rgba(255,255,255,0.18)":isActive?"#7c9ef8":"#cbd5e1" }}>{mod.title}</p>
+                  {!locked && <p style={{ fontSize:"10px", color:"rgba(255,255,255,0.25)", marginTop:"1px" }}>{watched}/{mod.videos.length} videos</p>}
                 </div>
               </div>
             </button>
@@ -347,44 +377,44 @@ function CourseView({course,user,onBack}){
       </div>
 
       {/* Content */}
-      <div style={{flex:1,padding:"28px 32px",overflowY:"auto"}}>
-        {(()=>{
-          const mod=course.modules.find(m=>m.id===activeModId);
-          if(!mod) return null;
-          if(isLocked(mod.id)) return(
-            <div style={{textAlign:"center",padding:"60px",color:"rgba(255,255,255,0.22)"}}>
-              <div style={{fontSize:"44px",marginBottom:"12px"}}>🔒</div>
+      <div style={{ flex:1, padding:"28px 32px", overflowY:"auto" }}>
+        {(() => {
+          const mod = course.modules.find(m => m.id === activeModId);
+          if (!mod) return null;
+          if (isModLocked(mod.id)) return (
+            <div style={{ textAlign:"center", padding:"60px", color:"rgba(255,255,255,0.22)" }}>
+              <div style={{ fontSize:"44px", marginBottom:"12px" }}>🔒</div>
               <p>Completa el modulo anterior para desbloquear este.</p>
             </div>
           );
-          const mp=cp[mod.id]||{watchedVideos:[],quizPassed:false};
-          const allWatched=mod.videos.every(v=>mp.watchedVideos.includes(v.id));
-          return(
+          const mp = cp[mod.id] || { watchedVideos:[], quizPassed:false };
+          const allWatched = mod.videos.every(v => mp.watchedVideos.includes(v.id));
+          return (
             <>
-              <div style={{marginBottom:"22px"}}>
-                <h2 style={{color:"#fff",fontSize:"20px",marginBottom:"6px",fontWeight:"700"}}>{mod.title}</h2>
-                <div style={{height:"2px",width:"40px",background:"linear-gradient(90deg,#7c9ef8,#a78bfa)",borderRadius:"2px",marginBottom:"10px"}}/>
-                <p style={{color:"rgba(255,255,255,0.4)",fontSize:"13px",lineHeight:"1.6"}}>{mod.description}</p>
+              <div style={{ marginBottom:"22px" }}>
+                <h2 style={{ color:"#fff", fontSize:"20px", marginBottom:"6px", fontWeight:"700" }}>{mod.title}</h2>
+                <div style={{ height:"2px", width:"40px", background:"linear-gradient(90deg,#7c9ef8,#a78bfa)", borderRadius:"2px", marginBottom:"10px" }}/>
+                <p style={{ color:"rgba(255,255,255,0.4)", fontSize:"13px", lineHeight:"1.6" }}>{mod.description}</p>
               </div>
-              <div style={{display:"flex",flexDirection:"column",gap:"7px",marginBottom:"22px"}}>
-                {mod.videos.map((vid,idx)=>{
-                  const vDone=mp.watchedVideos.includes(vid.id);
-                  const vAvail=idx===0||mp.watchedVideos.includes(mod.videos[idx-1].id);
-                  const st=vDone?"done":vAvail?"available":"locked";
-                  const isOpen=openVideoId===vid.id;
-                  return(
+              <div style={{ display:"flex", flexDirection:"column", gap:"7px", marginBottom:"22px" }}>
+                {mod.videos.map((vid, idx) => {
+                  const vDone = mp.watchedVideos.includes(vid.id);
+                  const vAvail = idx===0 || mp.watchedVideos.includes(mod.videos[idx-1].id);
+                  const st = vDone?"done":vAvail?"available":"locked";
+                  const isOpen = openVideoId === vid.id;
+                  return (
                     <div key={vid.id}>
                       <button onClick={()=>st!=="locked"&&setOpenVideoId(isOpen?null:vid.id)}
-                        style={{width:"100%",padding:"12px 15px",borderRadius:"9px",border:"1px solid",
-                          borderColor:st==="done"?"rgba(16,185,129,0.22)":st==="available"?"rgba(124,158,248,0.22)":"rgba(255,255,255,0.05)",
-                          background:st==="done"?"rgba(16,185,129,0.04)":st==="available"?"rgba(124,158,248,0.04)":"rgba(255,255,255,0.01)",
-                          cursor:st==="locked"?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:"11px",textAlign:"left",fontFamily:"Georgia,serif"}}>
-                        <span style={{fontSize:"17px"}}>{st==="done"?"✅":st==="locked"?"🔒":"▶️"}</span>
-                        <span style={{color:st==="locked"?"rgba(255,255,255,0.18)":"#e2e8f0",fontWeight:"500",flex:1,fontSize:"13px"}}>{vid.title}</span>
-                        <span style={{color:"rgba(255,255,255,0.22)",fontSize:"12px"}}>{vid.duration}</span>
+                        style={{ width:"100%", padding:"12px 15px", borderRadius:"9px", border:"1px solid",
+                          borderColor:st==="done"?"rgba(16,185,129,0.25)":st==="available"?"rgba(124,158,248,0.25)":"rgba(255,255,255,0.05)",
+                          background:st==="done"?"rgba(16,185,129,0.04)":st==="available"?"rgba(124,158,248,0.05)":"rgba(255,255,255,0.01)",
+                          cursor:st==="locked"?"not-allowed":"pointer", display:"flex", alignItems:"center", gap:"11px", textAlign:"left", fontFamily:"Georgia,serif" }}>
+                        <span style={{ fontSize:"17px" }}>{st==="done"?"✅":st==="locked"?"🔒":"▶️"}</span>
+                        <span style={{ color:st==="locked"?"rgba(255,255,255,0.18)":"#e2e8f0", fontWeight:"500", flex:1, fontSize:"13px" }}>{vid.title}</span>
+                        <span style={{ color:"rgba(255,255,255,0.22)", fontSize:"12px" }}>{vid.duration}</span>
                       </button>
-                      {isOpen&&(
-                        <div style={{paddingTop:"10px"}}>
+                      {isOpen && (
+                        <div style={{ paddingTop:"10px", animation:"fadeIn 0.3s ease" }}>
                           <YoutubeEmbed key={vid.id} videoId={vid.youtubeId} alreadyWatched={vDone} onComplete={()=>handleVideoComplete(mod.id,vid.id)}/>
                         </div>
                       )}
@@ -392,10 +422,10 @@ function CourseView({course,user,onBack}){
                   );
                 })}
               </div>
-              {allWatched&&!mp.quizPassed&&<QuizSection quiz={mod.quiz} onPass={()=>handleQuizPass(mod.id)}/>}
-              {mp.quizPassed&&(
-                <div style={{textAlign:"center",padding:"16px",background:"rgba(16,185,129,0.07)",borderRadius:"11px",border:"1px solid rgba(16,185,129,0.22)",color:"#10b981",fontWeight:"600",fontSize:"14px"}}>
-                  ✅ Modulo completado
+              {allWatched && !mp.quizPassed && <QuizSection quiz={mod.quiz} onPass={()=>handleQuizPass(mod.id)}/>}
+              {mp.quizPassed && (
+                <div style={{ textAlign:"center", padding:"16px", background:"rgba(16,185,129,0.07)", borderRadius:"11px", border:"1px solid rgba(16,185,129,0.22)", color:"#10b981", fontWeight:"600", fontSize:"14px" }}>
+                  ✅ Modulo completado — el siguiente ya esta desbloqueado
                 </div>
               )}
             </>
@@ -409,27 +439,28 @@ function CourseView({course,user,onBack}){
 // ============================================================
 // COURSE PICKER
 // ============================================================
-function CoursePicker({user}){
-  const [selected,setSelected]=useState(null);
-  const myCourses=COURSES_CATALOG.filter(c=>(user.courses||[]).includes(c.id));
-  if(selected) return <CourseView course={selected} user={user} onBack={()=>setSelected(null)}/>;
-  return(
-    <div style={{padding:"36px 32px"}}>
-      <h2 style={{color:"#fff",fontSize:"21px",marginBottom:"4px"}}>Mis cursos</h2>
-      <p style={{color:"rgba(255,255,255,0.3)",fontSize:"13px",marginBottom:"28px"}}>Tienes acceso a {myCourses.length} curso{myCourses.length!==1?"s":""}.</p>
-      {myCourses.length===0?(
-        <div style={{textAlign:"center",padding:"60px",color:"rgba(255,255,255,0.2)"}}>Sin cursos asignados. Contacta con tu administrador.</div>
-      ):(
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:"14px"}}>
-          {myCourses.map(course=>(
+function CoursePicker({ user }) {
+  const [selected, setSelected] = useState(null);
+  const [data] = useState(() => initData());
+  const myCourses = (data.courses||[]).filter(c => (user.courses||[]).includes(c.id));
+  if (selected) return <CourseView course={selected} user={user} onBack={()=>setSelected(null)}/>;
+  return (
+    <div style={{ padding:"36px 32px" }}>
+      <h2 style={{ color:"#fff", fontSize:"21px", marginBottom:"4px" }}>Mis cursos</h2>
+      <p style={{ color:"rgba(255,255,255,0.3)", fontSize:"13px", marginBottom:"28px" }}>Tienes acceso a {myCourses.length} curso{myCourses.length!==1?"s":""}.</p>
+      {myCourses.length===0 ? (
+        <div style={{ textAlign:"center", padding:"60px", color:"rgba(255,255,255,0.2)" }}>Sin cursos asignados. Contacta con tu administrador.</div>
+      ) : (
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))", gap:"14px" }}>
+          {myCourses.map(course => (
             <button key={course.id} onClick={()=>setSelected(course)}
-              style={{padding:"26px 22px",borderRadius:"14px",border:"1px solid rgba(255,255,255,0.07)",background:"rgba(255,255,255,0.02)",cursor:"pointer",textAlign:"left",fontFamily:"Georgia,serif",transition:"all 0.2s"}}
+              style={{ padding:"26px 22px", borderRadius:"14px", border:"1px solid rgba(255,255,255,0.07)", background:"rgba(255,255,255,0.02)", cursor:"pointer", textAlign:"left", fontFamily:"Georgia,serif", transition:"all 0.2s" }}
               onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(124,158,248,0.35)";e.currentTarget.style.background="rgba(124,158,248,0.06)";}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,0.07)";e.currentTarget.style.background="rgba(255,255,255,0.02)";}}>
-              <div style={{fontSize:"34px",marginBottom:"12px"}}>{course.emoji}</div>
-              <h3 style={{color:"#e2e8f0",fontSize:"15px",marginBottom:"5px",fontWeight:"700"}}>{course.title}</h3>
-              <p style={{color:"rgba(255,255,255,0.32)",fontSize:"13px",marginBottom:"12px",lineHeight:"1.5"}}>{course.description}</p>
-              <span style={{fontSize:"12px",color:"#7c9ef8"}}>{course.modules.length} modulos →</span>
+              <div style={{ fontSize:"34px", marginBottom:"12px" }}>{course.emoji}</div>
+              <h3 style={{ color:"#e2e8f0", fontSize:"15px", marginBottom:"5px", fontWeight:"700" }}>{course.title}</h3>
+              <p style={{ color:"rgba(255,255,255,0.32)", fontSize:"13px", marginBottom:"12px", lineHeight:"1.5" }}>{course.description}</p>
+              <span style={{ fontSize:"12px", color:"#7c9ef8" }}>{course.modules.length} modulos →</span>
             </button>
           ))}
         </div>
@@ -439,73 +470,361 @@ function CoursePicker({user}){
 }
 
 // ============================================================
+// ADMIN — QUIZ EDITOR
+// ============================================================
+function QuizEditor({ quiz, onChange }) {
+  const addQ = () => onChange([...quiz, { id:uid(), question:"", options:["","","",""], correct:0 }]);
+  const removeQ = id => onChange(quiz.filter(q=>q.id!==id));
+  const updateQ = (id, field, val) => onChange(quiz.map(q=>q.id===id?{...q,[field]:val}:q));
+  const updateOpt = (id, oi, val) => onChange(quiz.map(q=>q.id===id?{...q,options:q.options.map((o,i)=>i===oi?val:o)}:q));
+
+  return (
+    <div>
+      {quiz.map((q, qi) => (
+        <div key={q.id} style={{ ...CARD, marginBottom:"12px" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
+            <span style={{ color:"#7c9ef8", fontSize:"12px", fontWeight:"700" }}>Pregunta {qi+1}</span>
+            <button style={B("sm-danger")} onClick={()=>removeQ(q.id)}>✕ Eliminar</button>
+          </div>
+          <input style={{ ...INP, marginBottom:"10px" }} placeholder="Texto de la pregunta..." value={q.question} onChange={e=>updateQ(q.id,"question",e.target.value)} />
+          <p style={{ color:"rgba(255,255,255,0.35)", fontSize:"11px", marginBottom:"7px", textTransform:"uppercase", letterSpacing:"0.5px" }}>Opciones (marca la correcta)</p>
+          {q.options.map((opt, oi) => (
+            <div key={oi} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"6px" }}>
+              <input type="radio" checked={q.correct===oi} onChange={()=>updateQ(q.id,"correct",oi)}
+                style={{ accentColor:"#10b981", width:"16px", height:"16px", flexShrink:0, cursor:"pointer" }} />
+              <input style={{ ...INP, borderColor:q.correct===oi?"rgba(16,185,129,0.4)":"rgba(255,255,255,0.12)" }}
+                placeholder={`Opcion ${oi+1}`} value={opt} onChange={e=>updateOpt(q.id,oi,e.target.value)} />
+            </div>
+          ))}
+        </div>
+      ))}
+      <button style={{ ...B("ghost"), width:"100%", marginTop:"4px" }} onClick={addQ}>+ Añadir pregunta</button>
+    </div>
+  );
+}
+
+// ============================================================
+// ADMIN — VIDEO EDITOR
+// ============================================================
+function VideoEditor({ videos, onChange }) {
+  const addV = () => onChange([...videos, { id:uid(), title:"", youtubeId:"", duration:"" }]);
+  const removeV = id => onChange(videos.filter(v=>v.id!==id));
+  const updateV = (id, field, val) => onChange(videos.map(v=>v.id===id?{...v,[field]:val}:v));
+
+  // Extract youtubeId from full URL or short id
+  const parseYtId = (input) => {
+    const match = input.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
+    return match ? match[1] : input.trim();
+  };
+
+  return (
+    <div>
+      {videos.map((v, vi) => (
+        <div key={v.id} style={{ ...CARD, marginBottom:"10px" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
+            <span style={{ color:"#7c9ef8", fontSize:"12px", fontWeight:"700" }}>Video {vi+1}</span>
+            <button style={B("sm-danger")} onClick={()=>removeV(v.id)}>✕</button>
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:"7px" }}>
+            <input style={INP} placeholder="Titulo del video" value={v.title} onChange={e=>updateV(v.id,"title",e.target.value)} />
+            <input style={INP} placeholder="URL de YouTube (ej: https://youtube.com/watch?v=ABC123) o solo el ID"
+              value={v.youtubeId}
+              onChange={e=>updateV(v.id,"youtubeId",parseYtId(e.target.value))}
+            />
+            <input style={{ ...INP, width:"120px" }} placeholder="Duracion (ej: 5:30)" value={v.duration} onChange={e=>updateV(v.id,"duration",e.target.value)} />
+          </div>
+        </div>
+      ))}
+      <button style={{ ...B("ghost"), width:"100%", marginTop:"4px" }} onClick={addV}>+ Añadir video</button>
+    </div>
+  );
+}
+
+// ============================================================
+// ADMIN — MODULE EDITOR (inside a course)
+// ============================================================
+function ModuleEditor({ modules, onChange }) {
+  const [openModId, setOpenModId] = useState(null);
+
+  const addMod = () => {
+    const m = { id:uid(), title:"Nuevo modulo", description:"", videos:[], quiz:[] };
+    onChange([...modules, m]);
+    setOpenModId(m.id);
+  };
+  const removeMod = id => onChange(modules.filter(m=>m.id!==id));
+  const updateMod = (id, field, val) => onChange(modules.map(m=>m.id===id?{...m,[field]:val}:m));
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
+      {modules.map((mod, mi) => {
+        const isOpen = openModId === mod.id;
+        return (
+          <div key={mod.id} style={{ border:"1px solid rgba(255,255,255,0.1)", borderRadius:"10px", overflow:"hidden" }}>
+            {/* Module header */}
+            <div style={{ display:"flex", alignItems:"center", gap:"10px", padding:"12px 14px", background:"rgba(255,255,255,0.03)", cursor:"pointer" }}
+              onClick={()=>setOpenModId(isOpen?null:mod.id)}>
+              <span style={{ color:"rgba(255,255,255,0.4)", fontSize:"12px" }}>{isOpen?"▾":"▸"}</span>
+              <span style={{ color:"#e2e8f0", fontWeight:"600", flex:1, fontSize:"13px" }}>
+                Modulo {mi+1}: {mod.title}
+              </span>
+              <span style={{ color:"rgba(255,255,255,0.3)", fontSize:"11px" }}>{mod.videos.length} videos · {mod.quiz.length} preguntas</span>
+              <button style={B("sm-danger")} onClick={e=>{e.stopPropagation();removeMod(mod.id);}}>✕</button>
+            </div>
+            {/* Module body */}
+            {isOpen && (
+              <div style={{ padding:"16px", background:"rgba(0,0,0,0.2)", display:"flex", flexDirection:"column", gap:"16px" }}>
+                <div>
+                  <label style={{ color:"rgba(255,255,255,0.45)", fontSize:"11px", textTransform:"uppercase", letterSpacing:"0.5px", display:"block", marginBottom:"6px" }}>Titulo del modulo</label>
+                  <input style={INP} value={mod.title} onChange={e=>updateMod(mod.id,"title",e.target.value)} />
+                </div>
+                <div>
+                  <label style={{ color:"rgba(255,255,255,0.45)", fontSize:"11px", textTransform:"uppercase", letterSpacing:"0.5px", display:"block", marginBottom:"6px" }}>Descripcion</label>
+                  <textarea style={{ ...INP, minHeight:"60px" }} value={mod.description} onChange={e=>updateMod(mod.id,"description",e.target.value)} />
+                </div>
+                <div>
+                  <label style={{ color:"rgba(255,255,255,0.45)", fontSize:"11px", textTransform:"uppercase", letterSpacing:"0.5px", display:"block", marginBottom:"8px" }}>Videos</label>
+                  <VideoEditor videos={mod.videos} onChange={vids=>updateMod(mod.id,"videos",vids)} />
+                </div>
+                <div>
+                  <label style={{ color:"rgba(255,255,255,0.45)", fontSize:"11px", textTransform:"uppercase", letterSpacing:"0.5px", display:"block", marginBottom:"8px" }}>Quiz (se muestra al terminar todos los videos)</label>
+                  <QuizEditor quiz={mod.quiz} onChange={quiz=>updateMod(mod.id,"quiz",quiz)} />
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <button style={{ ...B("ghost"), width:"100%" }} onClick={addMod}>+ Añadir modulo</button>
+    </div>
+  );
+}
+
+// ============================================================
 // ADMIN PANEL
 // ============================================================
-function AdminPanel(){
-  const [data,setData]=useState(()=>initData());
-  const [tab,setTab]=useState("progress");
-  const [newUser,setNewUser]=useState({name:"",password:"",courses:[]});
-  const [msg,setMsg]=useState("");
-  const persist=d=>{setData(d);saveData(d);};
-  const notify=m=>{setMsg(m);setTimeout(()=>setMsg(""),3000);};
-  const students=data.users.filter(u=>u.role==="student");
+function AdminPanel() {
+  const [data, setData] = useState(() => initData());
+  const [tab, setTab] = useState("courses");
+  const [editingCourse, setEditingCourse] = useState(null); // null | course object
+  const [newUser, setNewUser] = useState({ name:"", password:"", courses:[] });
+  const [msg, setMsg] = useState("");
 
-  const addUser=()=>{
-    if(!newUser.name.trim()||!newUser.password.trim()){notify("Rellena nombre y contrasena");return;}
-    const id="u"+Date.now();
-    persist({...data,users:[...data.users,{id,role:"student",name:newUser.name.trim(),password:newUser.password.trim(),courses:newUser.courses}]});
+  const persist = d => { setData(d); saveData(d); };
+  const notify = m => { setMsg(m); setTimeout(()=>setMsg(""),3000); };
+  const students = data.users.filter(u=>u.role==="student");
+  const courses = data.courses || [];
+
+  // ---- COURSES ----
+  const startNewCourse = () => {
+    setEditingCourse({ id:uid(), title:"Nuevo curso", description:"", emoji:"📚", modules:[] });
+  };
+  const saveCourse = () => {
+    if (!editingCourse.title.trim()) { notify("El curso necesita un titulo"); return; }
+    const existing = courses.find(c=>c.id===editingCourse.id);
+    const newCourses = existing
+      ? courses.map(c=>c.id===editingCourse.id?editingCourse:c)
+      : [...courses, editingCourse];
+    persist({ ...data, courses:newCourses });
+    setEditingCourse(null);
+    notify("Curso guardado");
+  };
+  const deleteCourse = id => {
+    persist({ ...data, courses:courses.filter(c=>c.id!==id),
+      users:data.users.map(u=>({...u,courses:(u.courses||[]).filter(c=>c!==id)})) });
+  };
+
+  // ---- USERS ----
+  const addUser = () => {
+    if (!newUser.name.trim()||!newUser.password.trim()) { notify("Rellena nombre y contrasena"); return; }
+    const id = "u"+Date.now();
+    persist({ ...data, users:[...data.users,{id,role:"student",name:newUser.name.trim(),password:newUser.password.trim(),courses:newUser.courses}] });
     setNewUser({name:"",password:"",courses:[]});
     notify("Usuario creado: "+newUser.name);
   };
-
-  const deleteUser=uid=>persist({...data,users:data.users.filter(u=>u.id!==uid)});
-
-  const toggleCourse=(uid,courseId)=>{
-    persist({...data,users:data.users.map(u=>{
+  const deleteUser = uid => persist({ ...data, users:data.users.filter(u=>u.id!==uid) });
+  const toggleCourse = (uid, courseId) => {
+    persist({ ...data, users:data.users.map(u=>{
       if(u.id!==uid) return u;
-      const courses=(u.courses||[]).includes(courseId)?u.courses.filter(c=>c!==courseId):[...(u.courses||[]),courseId];
-      return{...u,courses};
+      const c=(u.courses||[]).includes(courseId)?(u.courses||[]).filter(x=>x!==courseId):[...(u.courses||[]),courseId];
+      return{...u,courses:c};
     })});
   };
 
-  const getProgress=userId=>{
-    const user=data.users.find(u=>u.id===userId);
-    const p=data.progress[userId]||{};
-    return(user?.courses||[]).map(cid=>{
-      const course=COURSES_CATALOG.find(c=>c.id===cid);
+  // Progress
+  const getProgress = userId => {
+    const user = data.users.find(u=>u.id===userId);
+    const p = data.progress[userId]||{};
+    return (user?.courses||[]).map(cid=>{
+      const course=courses.find(c=>c.id===cid);
       if(!course) return null;
       const done=course.modules.filter(m=>p[cid]?.[m.id]?.quizPassed).length;
       return{course,done,total:course.modules.length};
     }).filter(Boolean);
   };
 
-  return(
-    <div style={{padding:"32px",overflowY:"auto",flex:1}}>
-      <h2 style={{color:"#fff",fontSize:"21px",marginBottom:"22px",fontWeight:"700"}}>👨‍💼 Panel de administrador</h2>
-      <div style={{display:"flex",gap:"7px",marginBottom:"26px"}}>
-        {[["progress","📊 Progreso"],["users","👥 Usuarios"]].map(([k,l])=>(
-          <button key={k} onClick={()=>setTab(k)} style={{padding:"8px 16px",borderRadius:"7px",border:"1px solid",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"600",fontSize:"13px",borderColor:tab===k?"#7c9ef8":"rgba(255,255,255,0.1)",background:tab===k?"rgba(124,158,248,0.13)":"transparent",color:tab===k?"#7c9ef8":"rgba(255,255,255,0.38)"}}>
+  // ---- COURSE EDITOR UI ----
+  if (editingCourse) return (
+    <div style={{ padding:"28px 32px", overflowY:"auto", flex:1 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"24px" }}>
+        <button style={B("ghost")} onClick={()=>setEditingCourse(null)}>← Volver</button>
+        <h2 style={{ color:"#fff", fontSize:"20px", fontWeight:"700", flex:1 }}>
+          {courses.find(c=>c.id===editingCourse.id) ? "Editar curso" : "Nuevo curso"}
+        </h2>
+        <button style={B("primary")} onClick={saveCourse}>💾 Guardar curso</button>
+      </div>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:"16px", maxWidth:"760px" }}>
+        {/* Basic info */}
+        <div style={CARD}>
+          <p style={{ color:"#7c9ef8", fontWeight:"700", fontSize:"12px", textTransform:"uppercase", letterSpacing:"1px", marginBottom:"14px" }}>Informacion del curso</p>
+          <div style={{ display:"flex", gap:"10px", marginBottom:"10px" }}>
+            <div style={{ flex:"0 0 80px" }}>
+              <label style={{ color:"rgba(255,255,255,0.4)", fontSize:"11px", display:"block", marginBottom:"5px" }}>Emoji</label>
+              <input style={{ ...INP, textAlign:"center", fontSize:"22px", padding:"6px" }} value={editingCourse.emoji} maxLength={2}
+                onChange={e=>setEditingCourse(c=>({...c,emoji:e.target.value}))} />
+            </div>
+            <div style={{ flex:1 }}>
+              <label style={{ color:"rgba(255,255,255,0.4)", fontSize:"11px", display:"block", marginBottom:"5px" }}>Titulo del curso *</label>
+              <input style={INP} placeholder="Titulo del curso" value={editingCourse.title}
+                onChange={e=>setEditingCourse(c=>({...c,title:e.target.value}))} />
+            </div>
+          </div>
+          <div>
+            <label style={{ color:"rgba(255,255,255,0.4)", fontSize:"11px", display:"block", marginBottom:"5px" }}>Descripcion</label>
+            <textarea style={{ ...INP, minHeight:"60px" }} placeholder="Descripcion breve del curso" value={editingCourse.description}
+              onChange={e=>setEditingCourse(c=>({...c,description:e.target.value}))} />
+          </div>
+        </div>
+
+        {/* Modules */}
+        <div style={CARD}>
+          <p style={{ color:"#7c9ef8", fontWeight:"700", fontSize:"12px", textTransform:"uppercase", letterSpacing:"1px", marginBottom:"14px" }}>
+            Modulos ({editingCourse.modules.length})
+          </p>
+          <ModuleEditor
+            modules={editingCourse.modules}
+            onChange={mods=>setEditingCourse(c=>({...c,modules:mods}))}
+          />
+        </div>
+
+        <div style={{ textAlign:"right" }}>
+          <button style={B("primary")} onClick={saveCourse}>💾 Guardar curso</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ---- MAIN ADMIN UI ----
+  return (
+    <div style={{ padding:"28px 32px", overflowY:"auto", flex:1 }}>
+      <h2 style={{ color:"#fff", fontSize:"21px", marginBottom:"22px", fontWeight:"700" }}>👨‍💼 Panel de administrador</h2>
+      <div style={{ display:"flex", gap:"7px", marginBottom:"26px" }}>
+        {[["courses","📚 Cursos"],["users","👥 Usuarios"],["progress","📊 Progreso"]].map(([k,l])=>(
+          <button key={k} onClick={()=>setTab(k)} style={{ padding:"8px 16px", borderRadius:"7px", border:"1px solid", cursor:"pointer", fontFamily:"Georgia,serif", fontWeight:"600", fontSize:"13px", borderColor:tab===k?"#7c9ef8":"rgba(255,255,255,0.1)", background:tab===k?"rgba(124,158,248,0.13)":"transparent", color:tab===k?"#7c9ef8":"rgba(255,255,255,0.38)" }}>
             {l}
           </button>
         ))}
       </div>
 
-      {tab==="progress"&&(
-        <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
-          {students.length===0&&<p style={{color:"rgba(255,255,255,0.22)",textAlign:"center",padding:"40px"}}>No hay alumnos todavia.</p>}
-          {students.map(student=>{
-            const prog=getProgress(student.id);
-            return(
-              <div key={student.id} style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:"11px",padding:"16px 18px"}}>
-                <p style={{color:"#e2e8f0",fontWeight:"700",marginBottom:"3px",fontSize:"15px"}}>{student.name}</p>
-                <p style={{color:"rgba(255,255,255,0.28)",marginBottom:"12px",fontSize:"12px"}}>{(student.courses||[]).length} curso(s) asignado(s)</p>
+      {/* COURSES TAB */}
+      {tab==="courses" && (
+        <div>
+          <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:"16px" }}>
+            <button style={B("primary")} onClick={startNewCourse}>+ Nuevo curso</button>
+          </div>
+          {courses.length===0 && <p style={{ color:"rgba(255,255,255,0.22)", textAlign:"center", padding:"40px" }}>No hay cursos. Crea el primero.</p>}
+          <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
+            {courses.map(course => (
+              <div key={course.id} style={{ ...CARD, display:"flex", alignItems:"center", gap:"14px" }}>
+                <span style={{ fontSize:"28px" }}>{course.emoji}</span>
+                <div style={{ flex:1 }}>
+                  <p style={{ color:"#e2e8f0", fontWeight:"700", marginBottom:"2px" }}>{course.title}</p>
+                  <p style={{ color:"rgba(255,255,255,0.3)", fontSize:"12px" }}>{course.modules.length} modulos · {course.modules.reduce((a,m)=>a+m.videos.length,0)} videos</p>
+                </div>
+                <div style={{ display:"flex", gap:"8px" }}>
+                  <button style={B("sm-ghost")} onClick={()=>setEditingCourse({...course,modules:JSON.parse(JSON.stringify(course.modules))})}>✏️ Editar</button>
+                  <button style={B("sm-danger")} onClick={()=>deleteCourse(course.id)}>✕ Eliminar</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* USERS TAB */}
+      {tab==="users" && (
+        <div>
+          <div style={{ background:"rgba(124,158,248,0.04)", border:"1px solid rgba(124,158,248,0.13)", borderRadius:"11px", padding:"18px", marginBottom:"20px" }}>
+            <p style={{ color:"#7c9ef8", fontWeight:"700", fontSize:"12px", textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>Añadir alumno</p>
+            <div style={{ display:"flex", gap:"9px", flexWrap:"wrap", marginBottom:"10px" }}>
+              <input style={{ ...INP, flex:1, minWidth:"130px" }} placeholder="Nombre completo" value={newUser.name} onChange={e=>setNewUser(u=>({...u,name:e.target.value}))} />
+              <input style={{ ...INP, flex:1, minWidth:"110px" }} placeholder="Contrasena" value={newUser.password} onChange={e=>setNewUser(u=>({...u,password:e.target.value}))} />
+              <button style={B("primary")} onClick={addUser}>+ Crear</button>
+            </div>
+            <p style={{ color:"rgba(255,255,255,0.3)", fontSize:"11px", marginBottom:"7px" }}>Asignar cursos:</p>
+            <div style={{ display:"flex", gap:"7px", flexWrap:"wrap" }}>
+              {courses.map(c=>{
+                const sel=newUser.courses.includes(c.id);
+                return <button key={c.id} onClick={()=>setNewUser(u=>({...u,courses:sel?u.courses.filter(x=>x!==c.id):[...u.courses,c.id]}))}
+                  style={{ padding:"5px 11px", borderRadius:"6px", border:"1px solid", cursor:"pointer", fontSize:"12px", fontFamily:"Georgia,serif",
+                    borderColor:sel?"#7c9ef8":"rgba(255,255,255,0.1)", background:sel?"rgba(124,158,248,0.18)":"transparent", color:sel?"#7c9ef8":"rgba(255,255,255,0.35)" }}>
+                  {c.emoji} {c.title}
+                </button>;
+              })}
+            </div>
+            {msg && <p style={{ fontSize:"13px", marginTop:"10px", color:"#10b981" }}>{msg}</p>}
+          </div>
+
+          <div style={{ display:"flex", flexDirection:"column", gap:"9px" }}>
+            {data.users.map(user => (
+              <div key={user.id} style={{ ...CARD }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:user.role==="student"?"9px":"0" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:"9px" }}>
+                    <span style={{ color:"#e2e8f0", fontWeight:"600", fontSize:"14px" }}>{user.name}</span>
+                    <span style={{ fontSize:"10px", padding:"2px 7px", borderRadius:"10px", background:user.role==="admin"?"rgba(167,139,250,0.18)":"rgba(124,158,248,0.13)", color:user.role==="admin"?"#a78bfa":"#7c9ef8" }}>{user.role}</span>
+                    <span style={{ color:"rgba(255,255,255,0.22)", fontSize:"12px" }}>🔑 {user.password}</span>
+                  </div>
+                  {user.role!=="admin" && <button style={{ ...B("sm-danger") }} onClick={()=>deleteUser(user.id)}>Eliminar</button>}
+                </div>
+                {user.role==="student" && (
+                  <div>
+                    <p style={{ color:"rgba(255,255,255,0.25)", fontSize:"10px", textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"5px" }}>Cursos asignados:</p>
+                    <div style={{ display:"flex", gap:"6px", flexWrap:"wrap" }}>
+                      {courses.map(c=>{
+                        const has=(user.courses||[]).includes(c.id);
+                        return <button key={c.id} onClick={()=>toggleCourse(user.id,c.id)}
+                          style={{ padding:"4px 10px", borderRadius:"5px", border:"1px solid", cursor:"pointer", fontSize:"11px", fontFamily:"Georgia,serif",
+                            borderColor:has?"#10b981":"rgba(255,255,255,0.08)", background:has?"rgba(16,185,129,0.13)":"transparent", color:has?"#10b981":"rgba(255,255,255,0.28)" }}>
+                          {c.emoji} {c.title}
+                        </button>;
+                      })}
+                      {courses.length===0&&<span style={{color:"rgba(255,255,255,0.2)",fontSize:"12px"}}>No hay cursos creados</span>}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* PROGRESS TAB */}
+      {tab==="progress" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+          {students.length===0 && <p style={{ color:"rgba(255,255,255,0.22)", textAlign:"center", padding:"40px" }}>No hay alumnos.</p>}
+          {students.map(student => {
+            const prog = getProgress(student.id);
+            return (
+              <div key={student.id} style={CARD}>
+                <p style={{ color:"#e2e8f0", fontWeight:"700", marginBottom:"3px", fontSize:"15px" }}>{student.name}</p>
+                <p style={{ color:"rgba(255,255,255,0.28)", marginBottom:"12px", fontSize:"12px" }}>{(student.courses||[]).length} curso(s) asignado(s)</p>
                 {prog.length===0
-                  ?<p style={{color:"rgba(255,255,255,0.18)",fontSize:"13px"}}>Sin cursos.</p>
-                  :<div style={{display:"flex",flexWrap:"wrap",gap:"8px"}}>
+                  ? <p style={{ color:"rgba(255,255,255,0.18)", fontSize:"13px" }}>Sin cursos asignados.</p>
+                  : <div style={{ display:"flex", flexWrap:"wrap", gap:"8px" }}>
                     {prog.map(({course,done,total})=>(
-                      <div key={course.id} style={{padding:"9px 13px",borderRadius:"7px",minWidth:"150px",background:done===total?"rgba(16,185,129,0.07)":"rgba(255,255,255,0.02)",border:"1px solid",borderColor:done===total?"rgba(16,185,129,0.22)":"rgba(255,255,255,0.06)"}}>
-                        <p style={{color:done===total?"#10b981":"#7c9ef8",fontSize:"12px",fontWeight:"700",marginBottom:"2px"}}>{course.emoji} {course.title}</p>
-                        <p style={{color:"rgba(255,255,255,0.3)",fontSize:"12px"}}>{done}/{total} modulos</p>
+                      <div key={course.id} style={{ padding:"9px 13px", borderRadius:"7px", minWidth:"150px", background:done===total?"rgba(16,185,129,0.07)":"rgba(255,255,255,0.02)", border:"1px solid", borderColor:done===total?"rgba(16,185,129,0.22)":"rgba(255,255,255,0.06)" }}>
+                        <p style={{ color:done===total?"#10b981":"#7c9ef8", fontSize:"12px", fontWeight:"700", marginBottom:"2px" }}>{course.emoji} {course.title}</p>
+                        <p style={{ color:"rgba(255,255,255,0.3)", fontSize:"12px" }}>{done}/{total} modulos</p>
                       </div>
                     ))}
                   </div>
@@ -515,52 +834,6 @@ function AdminPanel(){
           })}
         </div>
       )}
-
-      {tab==="users"&&(
-        <div>
-          <div style={{background:"rgba(124,158,248,0.04)",border:"1px solid rgba(124,158,248,0.13)",borderRadius:"11px",padding:"18px",marginBottom:"20px"}}>
-            <p style={{color:"#7c9ef8",fontWeight:"700",fontSize:"12px",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"12px"}}>Añadir alumno</p>
-            <div style={{display:"flex",gap:"9px",flexWrap:"wrap",marginBottom:"10px"}}>
-              <input style={{...INP,flex:1,minWidth:"130px"}} placeholder="Nombre completo" value={newUser.name} onChange={e=>setNewUser(u=>({...u,name:e.target.value}))}/>
-              <input style={{...INP,flex:1,minWidth:"110px"}} placeholder="Contrasena" value={newUser.password} onChange={e=>setNewUser(u=>({...u,password:e.target.value}))}/>
-              <button style={B("primary")} onClick={addUser}>+ Crear</button>
-            </div>
-            <p style={{color:"rgba(255,255,255,0.3)",fontSize:"11px",marginBottom:"7px"}}>Asignar cursos:</p>
-            <div style={{display:"flex",gap:"7px",flexWrap:"wrap"}}>
-              {COURSES_CATALOG.map(c=>{
-                const sel=newUser.courses.includes(c.id);
-                return<button key={c.id} onClick={()=>setNewUser(u=>({...u,courses:sel?u.courses.filter(x=>x!==c.id):[...u.courses,c.id]}))} style={{padding:"5px 11px",borderRadius:"6px",border:"1px solid",cursor:"pointer",fontSize:"12px",fontFamily:"Georgia,serif",borderColor:sel?"#7c9ef8":"rgba(255,255,255,0.1)",background:sel?"rgba(124,158,248,0.18)":"transparent",color:sel?"#7c9ef8":"rgba(255,255,255,0.35)"}}>{c.emoji} {c.title}</button>;
-              })}
-            </div>
-            {msg&&<p style={{fontSize:"13px",marginTop:"10px",color:"#10b981"}}>{msg}</p>}
-          </div>
-          <div style={{display:"flex",flexDirection:"column",gap:"9px"}}>
-            {data.users.map(user=>(
-              <div key={user.id} style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:"9px",padding:"13px 16px"}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:user.role==="student"?"9px":"0"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:"9px"}}>
-                    <span style={{color:"#e2e8f0",fontWeight:"600",fontSize:"14px"}}>{user.name}</span>
-                    <span style={{fontSize:"10px",padding:"2px 7px",borderRadius:"10px",background:user.role==="admin"?"rgba(167,139,250,0.18)":"rgba(124,158,248,0.13)",color:user.role==="admin"?"#a78bfa":"#7c9ef8"}}>{user.role}</span>
-                    <span style={{color:"rgba(255,255,255,0.22)",fontSize:"12px"}}>🔑 {user.password}</span>
-                  </div>
-                  {user.role!=="admin"&&<button style={{...B("danger"),padding:"5px 11px",fontSize:"12px"}} onClick={()=>deleteUser(user.id)}>Eliminar</button>}
-                </div>
-                {user.role==="student"&&(
-                  <div>
-                    <p style={{color:"rgba(255,255,255,0.25)",fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"5px"}}>Cursos:</p>
-                    <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
-                      {COURSES_CATALOG.map(c=>{
-                        const has=(user.courses||[]).includes(c.id);
-                        return<button key={c.id} onClick={()=>toggleCourse(user.id,c.id)} style={{padding:"4px 10px",borderRadius:"5px",border:"1px solid",cursor:"pointer",fontSize:"11px",fontFamily:"Georgia,serif",borderColor:has?"#10b981":"rgba(255,255,255,0.08)",background:has?"rgba(16,185,129,0.13)":"transparent",color:has?"#10b981":"rgba(255,255,255,0.28)"}}>{c.emoji} {c.title}</button>;
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -568,32 +841,31 @@ function AdminPanel(){
 // ============================================================
 // MAIN APP
 // ============================================================
-function App(){
-  const [currentUser,setCurrentUser]=useState(null);
-  const handleLogin=user=>{
-    const fresh=initData();
-    const freshUser=fresh.users.find(u=>u.id===user.id)||user;
-    setCurrentUser(freshUser);
+function App() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const handleLogin = user => {
+    const fresh = initData();
+    setCurrentUser(fresh.users.find(u=>u.id===user.id)||user);
   };
-  if(!currentUser) return <LoginScreen onLogin={handleLogin}/>;
-  return(
-    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",background:"linear-gradient(180deg,#0a0a1a 0%,#0d1628 100%)"}}>
+  if (!currentUser) return <LoginScreen onLogin={handleLogin}/>;
+  return (
+    <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", background:"linear-gradient(180deg,#0a0a1a,#0d1628)" }}>
       {/* Header */}
-      <div style={{height:"56px",borderBottom:"1px solid rgba(255,255,255,0.07)",padding:"0 22px",display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(10,10,26,0.92)",backdropFilter:"blur(12px)",position:"sticky",top:0,zIndex:100,flexShrink:0}}>
-        <div style={{display:"flex",alignItems:"center",gap:"9px"}}>
-          <span style={{fontSize:"19px"}}>🎓</span>
-          <span style={{color:"#fff",fontWeight:"700",fontSize:"14px"}}>Plataforma de Formacion</span>
+      <div style={{ height:"56px", borderBottom:"1px solid rgba(255,255,255,0.07)", padding:"0 22px", display:"flex", alignItems:"center", justifyContent:"space-between", background:"rgba(10,10,26,0.92)", backdropFilter:"blur(12px)", position:"sticky", top:0, zIndex:100, flexShrink:0 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:"9px" }}>
+          <span style={{ fontSize:"19px" }}>🎓</span>
+          <span style={{ color:"#fff", fontWeight:"700", fontSize:"14px" }}>Plataforma de Formacion</span>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:"13px"}}>
-          {currentUser.role==="admin"&&<span style={{color:"rgba(167,139,250,0.75)",fontSize:"11px",fontWeight:"700"}}>ADMIN</span>}
-          <div style={{width:"28px",height:"28px",borderRadius:"50%",background:"linear-gradient(135deg,#7c9ef8,#a78bfa)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"700",fontSize:"12px"}}>{currentUser.name[0]}</div>
-          <span style={{color:"rgba(255,255,255,0.5)",fontSize:"13px"}}>{currentUser.name}</span>
-          <button style={{...B("ghost"),padding:"6px 13px",fontSize:"12px"}} onClick={()=>setCurrentUser(null)}>Salir</button>
+        <div style={{ display:"flex", alignItems:"center", gap:"13px" }}>
+          {currentUser.role==="admin" && <span style={{ color:"rgba(167,139,250,0.75)", fontSize:"11px", fontWeight:"700" }}>ADMIN</span>}
+          <div style={{ width:"28px", height:"28px", borderRadius:"50%", background:"linear-gradient(135deg,#7c9ef8,#a78bfa)", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:"700", fontSize:"12px" }}>{currentUser.name[0]}</div>
+          <span style={{ color:"rgba(255,255,255,0.5)", fontSize:"13px" }}>{currentUser.name}</span>
+          <button style={{ ...B("ghost"), padding:"6px 13px", fontSize:"12px" }} onClick={()=>setCurrentUser(null)}>Salir</button>
         </div>
       </div>
       {/* Body */}
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        {currentUser.role==="admin"?<AdminPanel/>:<CoursePicker user={currentUser}/>}
+      <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+        {currentUser.role==="admin" ? <AdminPanel/> : <CoursePicker user={currentUser}/>}
       </div>
     </div>
   );
